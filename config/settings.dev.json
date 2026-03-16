@@ -1,0 +1,32 @@
+{
+  "AllowedIPs": [
+    "127.0.0.1",
+    "::1"
+  ],
+  "Instances": {
+    "stage": {
+      "Projects": {
+        "intern": {
+          "serviceDesk": false,
+          "projectKey": ""
+        },
+        "default": {
+          "serviceDesk": true,
+          "projectKey": "",
+          "serviceDeskId": 0,
+          "requestTypeId": 0
+        }
+      },
+      "Tenant": {
+        "default": ""
+      },
+      "Reporter": {
+        "default": ""
+      },
+      "Comment": {
+        "default": "intern"
+      }
+    }
+  },
+  "KeyVaultName": ""
+}

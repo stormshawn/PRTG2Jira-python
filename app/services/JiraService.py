@@ -2,6 +2,7 @@ from typing import Any, Dict, List, Optional
 import httpx
 import logging
 
+from app.config import get_instance_config, get_settings, Settings
 from app.models import InsightDto, IssueDto, JiraProjectSettingsDto, PropertyDto
 from app.models.CommentParametersDto import CommentParametersDto
 from app.models.ValueDto import ValueDto
@@ -19,16 +20,17 @@ class Jiraservice():
         Searches for an existing open ticket for given sensor id
         
         """
-        #TODO replace jira instance from configs
-        query_url: str = f'https://"{jira_instance}"-jira-base-uri/rest/api/latest/search?jql=project="{project}" AND (status=Open|status=Paused|status=In Progress OR status = Waiting for Customer OR status = Waiting for Vendor Support) AND description ~ id="{sensor_id}"' 
-        token: str = "Test token"
+        base_url: Optional[str] = get_instance_config(jira_instance, "jira-base-url")
+        query_url: str = f'project="{project}" AND (status=Open|status=Paused|status=In Progress OR status = Waiting for Customer OR status = Waiting for Vendor Support) AND description ~ id="{sensor_id}"' 
+        token: str = get_instance_config(jira_instance, "jira-token")
         headers: Dict[str, Any] = {
             "Authorization": f"Bearer {token}", 
             "Content-Type": "application/json"
         }
 
         try:
-            response: httpx.Response = await self.http_client.get(query_url, headers=headers)
+            response: httpx.Response = await self.http_client.get(f"query_url{base_url}/rest/api/2/search", 
+                                                                  params = {"jql": query_url },headers=headers)
             if response.status_code == 200:
                 data: Dict[str, Any] = response.json()
                 issues: List[Dict[str, Any]] = data.get("issues", [])
@@ -41,8 +43,8 @@ class Jiraservice():
         """
             Writing comment later
         """
-        base_url: str = "Get it from config later"
-        token: str = "Test token"
+        base_url: Optional[str] = get_instance_config(jira_instance, "jira-base-url")
+        token: str = get_instance_config(jira_instance, "jira-token")
         headers: Dict[str, Any] = {
             "Authorization": f"Bearer {token}", 
             "Content-Type": "application/json"
@@ -96,8 +98,8 @@ class Jiraservice():
     async def get_crm_key(self, jira_instance: str, customer_number: str, tenant: str)->str:
         # we will get the url from the config
         # jira_instance will be used once we get the config
-        base_url: str = "Get it from config later"
-        token: str = "Test token"
+        base_url: Optional[str] = get_instance_config(jira_instance, "jira-base-url")
+        token: str = get_instance_config(jira_instance, "jira-token")
         headers: Dict[str, Any] = {
             "Authorization": f"Bearer {token}", 
             "Content-Type": "application/json"
@@ -109,7 +111,7 @@ class Jiraservice():
                                   "includeAttributesDeep": 5,
                                   "iql": f'"WL Account Number" = {customer_number} AND "Mandant" = {tenant}'}
         try:
-            response: httpx.Response= await self.http_client.get(base_url, headers=headers, params=params)
+            response: httpx.Response= await self.http_client.get(f"https://{base_url}/rest/insight/1.0/iql/objects", headers=headers, params=params)
             if response.status_code in [200]:
                 response_body: Dict[str, Any] = response.json
                 object_response: InsightDto = InsightDto(**response_body)
@@ -140,9 +142,9 @@ class Jiraservice():
 
         
 
-        base_url: str = "Get it from config later"
-        prtg_url: str = "Get from config later"
-        token: str = "Test token"
+        base_url: Optional[str] = get_instance_config(jira_instance, "jira-base-url")
+        prtg_url: str =get_instance_config(monitoring_instance, "prtg-base-url")
+        token: str = get_instance_config(jira_instance, "jira-token")
         headers: Dict[str, Any] = {
             "Authorization": f"Bearer {token}", 
             "Content-Type": "application/json"
@@ -201,13 +203,10 @@ class Jiraservice():
             jira_instance )-> str:
 
 
-
-
-        
-
-        base_url: str = "Get it from config later"
-        prtg_url: str = "Get from config later"
-        token: str = "Test token"
+       
+        base_url: Optional[str] = get_instance_config(jira_instance, "jira-base-url")
+        prtg_url: str =get_instance_config(monitoring_instance, "prtg-base-url")
+        token: str = get_instance_config(jira_instance, "jira-token")
         headers: Dict[str, Any] = {
             "Authorization": f"Bearer {token}", 
             "Content-Type": "application/json"
@@ -263,8 +262,8 @@ class Jiraservice():
         
 
 
-        base_url: str = "Get it from config later"
-        token: str = "Test token"
+        base_url: Optional[str] = get_instance_config(jira_instance, "jira-base-url")
+        token: str = get_instance_config(jira_instance, "jira-token")
         headers: Dict[str, Any] = {
         "Authorization": f"Bearer {token}", 
         "Content-Type": "application/json"
@@ -297,9 +296,18 @@ class Jiraservice():
             return -2
         
     def get_from_tags(self, tags: str, instance: str, setting: str)-> str:
-        project_keys: Dict[str, Any]  #get it from config later
+        settings_obj: Optional[Settings] = get_settings()
+        if not settings_obj or not settings_obj.instances:
+            return ""
+        instance_config: Optional[Dict[str, Any]] = settings_obj.instances.get(instance)
+        if not instance_config:
+            return ""
+        
+        project_keys: Optional[Dict[str, Any]]  = instance_config.get(setting)
+        if not project_keys:
+            return ""
         tag_list: List[str] = tags.split()
-
+        
         try:
             matched_value: Optional[str]  = None
             for key, value in project_keys.items():
@@ -322,7 +330,16 @@ class Jiraservice():
             return ""
 
     def get_project_from_tags(self, tags: str, instance: str, setting: str)-> JiraProjectSettingsDto:
-        section: Dict[str, Any] #define after having config file
+        settings_obj: Optional[Settings] = get_settings()
+        if not settings_obj or not settings_obj.instances:
+            return JiraProjectSettingsDto
+        instance_config: Optional[Dict[str, Any]] = settings_obj.instances.get(instance)
+        if not instance_config:
+            return JiraProjectSettingsDto
+        section: Optional[Dict[str, Any]] = instance_config.get(settings_obj)
+        if not section:
+            return JiraProjectSettingsDto
+        
         tag_list: List[str] = tags.split()
         try:
             matched_section: Dict[str, Any] = None
@@ -338,14 +355,27 @@ class Jiraservice():
                 matched_section = default_section
             if matched_section is not None:
                 settings: JiraProjectSettingsDto = JiraProjectSettingsDto()
-                settings.
+                # settings.JiraProjectSettingsDto # not sure why the variables are not propagating
+                
                 for key, value in matched_section.items():
                     key_lower: str = key.lower
                     if key_lower == "projectkey":
-                        settings.Pro
+                        settings.project_key = value if value else ""
                     elif key_lower == "servicedesk":
+                        if isinstance(value, bool):
+                            settings.service_desk = value
+                        else:
+                            settings.service_desk = False
                     elif key_lower == "servicedeskid":
+                        settings.service_desk_id = int(value) if value else None
                     elif key_lower == "requesttypeid":
-                    
-
+                        settings.request_type_id = int(value) if value else None
+                return settings
+            return JiraProjectSettingsDto()
         except Exception as e:
+            return JiraProjectSettingsDto()
+    
+
+
+
+    
