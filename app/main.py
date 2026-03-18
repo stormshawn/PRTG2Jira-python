@@ -6,10 +6,10 @@ import logging
 from typing import List
 
 from fastapi import FastAPI, HTTPException
-
+from fastapi.responses import JSONResponse
 from app.config import get_instance_config, get_settings, load_config
 from app.middleware.ip_whitelist import IPWhitelistMiddleware
-from app.models import JiraProjectSettingsDto
+from app.models import JiraProjectSettingsDto, ProblemResponseDto
 from app.models.JiraRequestDto import JiraRequestDto
 from app.services import JiraService, PRTGService
 
@@ -18,6 +18,12 @@ logging.basicConfig(
     format="%{astctime}s- %{name}s - %{levelname}s - %{message}s"
 )
 logger: logging.Logger = logging.getLogger(__name__)
+def _problem_response(detail: str, status_code: int)-> JSONResponse:
+    problem: ProblemResponseDto = ProblemResponseDto(
+        detail= detail,
+        status_code = status_code
+    )
+    return JSONResponse(status_code=status_code, content=problem.model_dump(by_alias=True))
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -50,7 +56,7 @@ async def health_check():
 
 @app.post("/{instance}/prtg2jira", tags=["PRTG Integration"], summary="Process PRTG notification", description="Receives http notification from PRTG and creates/updates Jira issue")
 
-async def process_prtg_notification(instance: str, 
+async def process_prtg_notification(instance: str,  # TODO: change from instance to jira_instance
                                     status: str = Form(...),
                                     name: str = Form(...),
                                     sensor_id: int = Form(...),
@@ -93,8 +99,7 @@ async def process_prtg_notification(instance: str,
         raise HTTPException(status_code=500, details="Problem 26")
 
 
-    open_ticket_key: str = await jira_service.get_first_open_ticket_async(jira_instance, jira_request.sensor_id, project.project_key)
-
+    open_ticket_key: str = await jira_service.get_first_open_ticket_async(instance, jira_request.sensor_id, project.project_key)
     down_warning_statuses: List[str] = ["Down",
 		 "Down (before: Warning)",
 		 "Warning",
@@ -105,3 +110,48 @@ async def process_prtg_notification(instance: str,
 		 "Down ended (now: Paused)",
 		 "Warning ended (now: Up)",
 		 "Up"]
+    # problem_response: ProblemResponseDto = None
+    if not open_ticket_key:
+        customer_id: str = jira_service.get_customer_id(jira_request.tags, jira_request.probe)
+        if customer_id == "0":
+            # problem_response.detail = f"Problem 19: Can not find CustomerID for {jira_request.name} Please manually Acknowledge and Create Ticket {jira_request.sensor_id}"
+            # problem_response.status_code = 404 # might update this to something else 
+            return _problem_response(f"Problem 19: Can not find CustomerID for {jira_request.name} Please manually Acknowledge and Create Ticket {jira_request.sensor_id}", 404)
+        crm_key: str = await jira_service.get_crm_key(instance, customer_id, tenant) 
+        if not crm_key:
+            return _problem_response(f"Problem 20: Can not find Customer CRM for {jira_request.name}.  Please manually Acknowledge and Create Ticket {jira_request.sensor_id}", 404)
+        if project.service_desk:
+            new_ticket_id: str = await jira_service.new_jira_ticket_service_desk(
+                device=device,
+                name=name,
+                status=status,
+                message=message,
+                sensor_id=sensor_id,
+                service_desk_id=project.service_desk_id or "0",
+                request_type_id=project.request_type_id or "0",
+                reporter=reporter,
+                prtg_request_instance=prtg_request_instance,
+                instance=instance # make it jira_instance later
+
+            ) # can be service or jira ticket
+        else: 
+                new_ticket_id: str = await jira_service.new_jira_ticket_service_desk(
+                device=device,
+                name=name,
+                status=status,
+                message=message,
+                sensor_id=sensor_id,
+                service_desk_id=project.service_desk_id or "0",
+                request_type_id=project.request_type_id or "0",
+                reporter=reporter,
+                prtg_request_instance=prtg_request_instance,
+                instance=instance # make it jira_instance later
+
+            ) # can be service or jira ticket
+            if new_ticket_id != "-1": # ensure right newJiraTicketId
+            update_jira_ticket: int = jira_service.update_jira_ticket(instance, new_ticket_id, crm_key, reporter)
+            if update_jira_ticket != 0:
+                    return _problem_response(f"Problem 25: Error occurred updating Ticket.\n Please review Logs.", 503)
+            set_comment: bool = await prtg_service.append_sensor_comment_async()
+            if not set_comment:
+                 
