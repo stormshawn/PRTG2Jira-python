@@ -5,19 +5,19 @@ from contextlib import asynccontextmanager
 import logging
 from typing import List
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Form
 from fastapi.responses import JSONResponse
 from app.config import get_instance_config, get_settings, load_config
-from app.middleware.ip_whitelist import IPWhitelistMiddleware
-from app.models import JiraProjectSettingsDto, ProblemResponseDto
-from app.models.JiraRequestDto import JiraRequestDto
+from app.middleware import IPWhitelistMiddleware
+from app.models import JiraProjectSettingsDto, ProblemResponseDto, JiraRequestDto
 from app.services import JiraService, PRTGService
 
 logging.basicConfig(
     level=logging.INFO,
-    format="%{astctime}s- %{name}s - %{levelname}s - %{message}s"
+    format="%{asctime}s- %{name}s - %{levelname}s - %{message}s"
 )
 logger: logging.Logger = logging.getLogger(__name__)
+
 def _problem_response(detail: str, status_code: int)-> JSONResponse:
     problem: ProblemResponseDto = ProblemResponseDto(
         detail= detail,
@@ -30,7 +30,7 @@ async def lifespan(app: FastAPI):
     logger.info("Starting PRTG service")
     load_config()
     settings = get_settings()
-    logger.info(f"Environment: (settings.environment)")
+    logger.info(f"Environment: {settings.environment}")
     yield
     logger.info("Shutting down PRTG Service")
 
@@ -55,14 +55,13 @@ async def health_check():
     return {"Status:": "OK"}
 
 @app.post("/{instance}/prtg2jira", tags=["PRTG Integration"], summary="Process PRTG notification", description="Receives http notification from PRTG and creates/updates Jira issue")
-
 async def process_prtg_notification(instance: str,  # TODO: change from instance to jira_instance
                                     status: str = Form(...),
                                     name: str = Form(...),
                                     sensor_id: int = Form(...),
                                     priority: Optional[str] = Form(None),
-                                    probe: Optional[str] = Form(None),                                    priority: Optional[str] = Form(None),
-                                    device: Optional[str] = Form(None),                                    priority: Optional[str] = Form(None),
+                                    probe: Optional[str] = Form(None),                                   
+                                    device: Optional[str] = Form(None),
                                     message: Optional[str] = Form(None),
                                     tags: Optional[str] = Form(None),
                                     ):
