@@ -1,6 +1,6 @@
 from typing import List
 from pydantic import BaseModel, Field
-from app.Models import IssueDto
+from app.models import IssueDto
 
 class JiraIssuesDto(BaseModel):
     total: int = Field(alias="total")

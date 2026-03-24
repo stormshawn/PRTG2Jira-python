@@ -1,5 +1,5 @@
 from app.models import ObjectEntryDto
-
+from app.models.ObjectEntryDto import ObjectEntryDto
 from typing import List
 from pydantic import BaseModel, Field
 

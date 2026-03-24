@@ -1,7 +1,7 @@
 from typing import List
 from pydantic import BaseModel, Field
 
-from app.Models import PropertyDto
+from app.models.PropertyDto import PropertyDto
 
 
 

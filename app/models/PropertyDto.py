@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 
-from app.models import ValueDto
+from app.models.ValueDto import ValueDto
 
 class PropertyDto(BaseModel):
     key: int = Field(alias="key")

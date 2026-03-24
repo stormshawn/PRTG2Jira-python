@@ -3,7 +3,7 @@ Main application will go here
 """
 from contextlib import asynccontextmanager
 import logging
-from typing import List, Optional
+from typing import List, Optional, Annotated
 
 from fastapi import FastAPI, Form
 from fastapi.responses import JSONResponse
@@ -14,14 +14,14 @@ from app.services import JiraService, PRTGService
 
 logging.basicConfig(
     level=logging.INFO,
-    format="%{asctime}s- %{name}s - %{levelname}s - %{message}s"
+    format="%(asctime)s- %(name)s - %(levelname)s - %(message)s"
 )
 logger: logging.Logger = logging.getLogger(__name__)
 
-def _problem_response(detail: str, status_code: int)-> JSONResponse:
+def _problem_response(detail: str, status_code: int) -> JSONResponse:
     problem: ProblemResponseDto = ProblemResponseDto(
-        detail= detail,
-        status_code = status_code
+        detail=detail,
+        status_code=status_code
     )
     return JSONResponse(status_code=status_code, content=problem.model_dump(by_alias=True))
 
@@ -49,10 +49,10 @@ if settings.environment=="production":
 jira_service: JiraService = JiraService()
 prtg_service: PRTGService = PRTGService()
 
-@app.get("/status",tags=["Health"], summary="Health Check", description="Returns http OK to verify that the application is running")
+@app.get("/status", tags=["Health"], summary="Health Check", description="Returns http OK to verify that the application is running")
 
 async def health_check():
-    return {"Status:": "OK"}
+    return {"status:": "OK"}
 
 @app.post("/{instance}/prtg2jira", tags=["PRTG Integration"], summary="Process PRTG notification", description="Receives http notification from PRTG and creates/updates Jira issue")
 async def process_prtg_notification(instance: str,  # TODO: change from instance to jira_instance
