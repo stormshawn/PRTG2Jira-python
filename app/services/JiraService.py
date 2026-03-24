@@ -1,16 +1,19 @@
 from typing import Any, Dict, List, Optional
 import httpx
 import logging
-
 from app.config import get_instance_config, get_settings, Settings
-from app.models import InsightDto, IssueDto, JiraProjectSettingsDto, PropertyDto
-from app.models.CommentParametersDto import CommentParametersDto
-from app.models.ValueDto import ValueDto
+from app.models import (
+    CommentParametersDto,
+    InsightDto,
+    IssueDto,
+    JiraProjectSettingsDto,
+    PropertyDto,
+    ValueDto,
+)
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-
-class Jiraservice():
+class JiraService():
     def __init__(self):
         self.http_client: httpx.AsyncClient = httpx.AsyncClient(timeout=30)
 
@@ -21,7 +24,7 @@ class Jiraservice():
         
         """
         base_url: Optional[str] = get_instance_config(jira_instance, "jira-base-url")
-        query_url: str = f'project="{project}" AND (status=Open|status=Paused|status=In Progress OR status = Waiting for Customer OR status = Waiting for Vendor Support) AND description ~ id="{sensor_id}"' 
+        query_url: str = f'project="{project}" AND status IN (Open, Paused, "In Progress", "Waiting for Customer", "Waiting for Vendor Support") AND description ~ "id={sensor_id}"'
         token: str = get_instance_config(jira_instance, "jira-token")
         headers: Dict[str, Any] = {
             "Authorization": f"Bearer {token}", 
@@ -29,16 +32,21 @@ class Jiraservice():
         }
 
         try:
-            response: httpx.Response = await self.http_client.get(f"query_url{base_url}/rest/api/2/search", 
-                                                                  params = {"jql": query_url },headers=headers)
+            response: httpx.Response = await self.http_client.get(
+                f"https://{base_url}/rest/api/2/search",
+                params={"jql": query_url},
+                headers=headers
+            )
             if response.status_code == 200:
                 data: Dict[str, Any] = response.json()
                 issues: List[Dict[str, Any]] = data.get("issues", [])
                 if issues:
                     return issues[0].get("key")
+            return None
         except Exception as e:
             # None # going to write a logger here eventually
             logger.error(f"Error getting open Tickets. Exception: {e}.")
+            return None
     async def add_jira_comment_async(self, jira_instance: str, ticket: str, device: str, name: str, status: str, message: str, comment_internal: bool = True)-> bool:
         """
             Writing comment later
@@ -83,12 +91,12 @@ class Jiraservice():
         for tag in tags.split(" "):
             if not found_customer_number and "Kunde:" in tag and tag.strip():
                 customer_number = tag.split(":")[1]
-                logger.info("The submitted Kontonummer from the tags was: {customer_number}")
+                logger.info(f"The submitted Kontonummer from the tags was: {customer_number}")
                 found_customer_number = True
         if not found_customer_number:
             probe_split = probe.split("-")[0]
             if len(probe_split) >= 5 and probe_split.isdigit():
-                logger.info(f"WARNING: no customer number via Tags available the customer number from the remote-probename was: {customer_number}")
+                logger.info(f"WARNING: no customer number via Tags available the customer number from the remote-probename was: {probe_split}")
                 customer_number= probe_split
             else:
                 customer_number = "0"
@@ -113,7 +121,7 @@ class Jiraservice():
         try:
             response: httpx.Response= await self.http_client.get(f"https://{base_url}/rest/insight/1.0/iql/objects", headers=headers, params=params)
             if response.status_code in [200]:
-                response_body: Dict[str, Any] = response.json
+                response_body: Dict[str, Any] = response.json()
                 object_response: InsightDto = InsightDto(**response_body)
                 object_key: str = object_response.object_entries[0].object_key
                 logger.info(f"CRM-Key is : {object_key}")
@@ -140,7 +148,6 @@ class Jiraservice():
             monitoring_instance: str,
             jira_instance: str)-> str:
 
-        
 
         base_url: Optional[str] = get_instance_config(jira_instance, "jira-base-url")
         prtg_url: str =get_instance_config(monitoring_instance, "prtg-base-url")
@@ -149,9 +156,6 @@ class Jiraservice():
             "Authorization": f"Bearer {token}", 
             "Content-Type": "application/json"
         }
-
-
-
 
         ticket_parameters: Dict[str, Any] = {
             "serviceDeskId": service_desk_id,
@@ -186,7 +190,7 @@ class Jiraservice():
                 logger.debug(f"{ticket_parameters}")
                 return "-1"
         except Exception as e:
-            logger.error(f"Error on invoking of NewJiraTicket to create the Ticket. {response}")
+            logger.error(f"Error on invoking of NewJiraTicket to create the Ticket. {e}")
             logger.debug(f"{ticket_parameters}")
             return "-1"
     
@@ -200,10 +204,9 @@ class Jiraservice():
             sensor_id:int, 
             project:str, 
             monitoring_instance:str, 
-            jira_instance )-> str:
+            jira_instance:str )-> str:
 
-
-       
+      
         base_url: Optional[str] = get_instance_config(jira_instance, "jira-base-url")
         prtg_url: str =get_instance_config(monitoring_instance, "prtg-base-url")
         token: str = get_instance_config(jira_instance, "jira-token")
@@ -211,8 +214,6 @@ class Jiraservice():
             "Authorization": f"Bearer {token}", 
             "Content-Type": "application/json"
         }
-
-
 
 
         ticket_parameters: Dict[str, Any] = {
@@ -248,7 +249,7 @@ class Jiraservice():
                 logger.debug(f"{ticket_parameters}")
                 return "-1"
         except Exception as e:
-            logger.error(f"Error on invoking of new_jira_ticket to create the Ticket. {response}")
+            logger.error(f"Error on invoking of new_jira_ticket to create the Ticket. {e}")
             logger.debug(f"{ticket_parameters}")
             return "-1"
     
@@ -258,7 +259,7 @@ class Jiraservice():
             ticket_id: str,
             crm_key: str,
             reporter: str
-            )-> str:
+            )-> int:
         
 
 
@@ -268,7 +269,6 @@ class Jiraservice():
         "Authorization": f"Bearer {token}", 
         "Content-Type": "application/json"
         }
-
 
         ticket_parameters: Dict[str, Any] = {
 
@@ -313,7 +313,7 @@ class Jiraservice():
             for key, value in project_keys.items():
                 if key.lower() == "default":
                     continue
-                if any (tag.lower() in key.lower for tag in tag_list):
+                if any (tag.lower() in key.lower() for tag in tag_list):
                     matched_value = str(value) if value else None
                     break
             if matched_value:
@@ -332,33 +332,31 @@ class Jiraservice():
     def get_project_from_tags(self, tags: str, instance: str, setting: str)-> JiraProjectSettingsDto:
         settings_obj: Optional[Settings] = get_settings()
         if not settings_obj or not settings_obj.instances:
-            return JiraProjectSettingsDto
+            return JiraProjectSettingsDto()
         instance_config: Optional[Dict[str, Any]] = settings_obj.instances.get(instance)
         if not instance_config:
-            return JiraProjectSettingsDto
-        section: Optional[Dict[str, Any]] = instance_config.get(settings_obj)
+            return JiraProjectSettingsDto()
+        section: Optional[Dict[str, Any]] = instance_config.get(setting)
         if not section:
-            return JiraProjectSettingsDto
+            return JiraProjectSettingsDto()
         
         tag_list: List[str] = tags.split()
         try:
-            matched_section: Dict[str, Any] = None
+            matched_section: Optional[Dict[str, Any]] = None
             for key, value in section.items():
                 if key.lower() == "default":
                     continue
-                if any (tag.lower() in key.lower for tag in tag_list):
+                if any (tag.lower() in key.lower() for tag in tag_list):
                     matched_section = value if isinstance(value, dict) else {}
                     break
             if matched_section is None:
-                default_section: Optional[Dict[str, Any]] = section.items("default")
-            if default_section and isinstance(default_section, dict):
-                matched_section = default_section
+                default_section: Optional[Dict[str, Any]] = section.get("default")
+                if default_section and isinstance(default_section, dict):
+                    matched_section = default_section
             if matched_section is not None:
                 settings: JiraProjectSettingsDto = JiraProjectSettingsDto()
-                # settings.JiraProjectSettingsDto # not sure why the variables are not propagating
-                
                 for key, value in matched_section.items():
-                    key_lower: str = key.lower
+                    key_lower: str = key.lower()
                     if key_lower == "projectkey":
                         settings.project_key = value if value else ""
                     elif key_lower == "servicedesk":
@@ -374,8 +372,3 @@ class Jiraservice():
             return JiraProjectSettingsDto()
         except Exception as e:
             return JiraProjectSettingsDto()
-    
-
-
-
-    

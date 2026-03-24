@@ -3,7 +3,7 @@ Main application will go here
 """
 from contextlib import asynccontextmanager
 import logging
-from typing import List
+from typing import List, Optional
 
 from fastapi import FastAPI, Form
 from fastapi.responses import JSONResponse
@@ -60,7 +60,7 @@ async def process_prtg_notification(instance: str,  # TODO: change from instance
                                     name: str = Form(...),
                                     sensor_id: int = Form(...),
                                     priority: Optional[str] = Form(None),
-                                    probe: Optional[str] = Form(None),                                   
+                                    probe: Optional[str] = Form(None),
                                     device: Optional[str] = Form(None),
                                     message: Optional[str] = Form(None),
                                     tags: Optional[str] = Form(None),
@@ -77,12 +77,12 @@ async def process_prtg_notification(instance: str,  # TODO: change from instance
     jira_request_instance: str = instance if get_instance_config(instance, "jira-base-url") else "default"
     if not get_instance_config(jira_request_instance, "jira-base-url"):
         logger.error(f"Problem 0 Jira: {jira_request}")
-        raise HTTPException(status_code=500, details="Problem 0 Jira")
+        return _problem_response("Problem 0 Jira", 500)
     
     prtg_request_instance: str = instance if get_instance_config(instance, "prtg-base-url") else "default"
     if not get_instance_config(prtg_request_instance, "prtg-base-url"):
         logger.error(f"Problem 0 PRTG: {jira_request}")
-        raise HTTPException(status_code=500, details="Problem 0 PRTG")
+        return _problem_response("Problem 0 PRTG", 500)
     
     project: JiraProjectSettingsDto = jira_service.get_project_from_tags(tags, instance, "Projects")
     tenant: str = jira_service.get_from_tags(tags, instance, "Tenant")
@@ -90,67 +90,124 @@ async def process_prtg_notification(instance: str,  # TODO: change from instance
     comment_internal: bool = jira_service.get_from_tags(tags, instance, "Comment").lower() != "extern"
 
     if not project.project_key:
-        logger.error(f"Problem 22: {jira_request}") 
-        raise HTTPException(status_code=500, details="Problem 22")
+        logger.error(f"Problem 22: {jira_request}")
+        return _problem_response("Problem 22", 500)
     
     if project.service_desk and (not project.service_desk_id or not project.request_type_id):
-        logger.error(f"Problem 26: {jira_request}") 
-        raise HTTPException(status_code=500, details="Problem 26")
-
+        logger.error(f"Problem 26: {jira_request}")
+        return _problem_response("Problem 26", 500)
 
     open_ticket_key: str = await jira_service.get_first_open_ticket_async(instance, jira_request.sensor_id, project.project_key)
-    down_warning_statuses: List[str] = ["Down",
+
+    down_warning_statuses: List[str] = [
+         "Down",
 		 "Down (before: Warning)",
 		 "Warning",
 		 "Warning (before: Down)",
 		 "Warning ended (now: Down)",
 		 "Down ended (now: Warning)"]
-    up_ended_statuses: List[str] = ["Down ended (now: Up)",
+    up_ended_statuses: List[str] = [
+         "Down ended (now: Up)",
 		 "Down ended (now: Paused)",
 		 "Warning ended (now: Up)",
 		 "Up"]
     # problem_response: ProblemResponseDto = None
-    if not open_ticket_key:
-        customer_id: str = jira_service.get_customer_id(jira_request.tags, jira_request.probe)
-        if customer_id == "0":
-            # problem_response.detail = f"Problem 19: Can not find CustomerID for {jira_request.name} Please manually Acknowledge and Create Ticket {jira_request.sensor_id}"
-            # problem_response.status_code = 404 # might update this to something else 
-            return _problem_response(f"Problem 19: Can not find CustomerID for {jira_request.name} Please manually Acknowledge and Create Ticket {jira_request.sensor_id}", 404)
-        crm_key: str = await jira_service.get_crm_key(instance, customer_id, tenant) 
-        if not crm_key:
-            return _problem_response(f"Problem 20: Can not find Customer CRM for {jira_request.name}.  Please manually Acknowledge and Create Ticket {jira_request.sensor_id}", 404)
-        if project.service_desk:
-            new_ticket_id: str = await jira_service.new_jira_ticket_service_desk(
-                device=device,
-                name=name,
-                status=status,
-                message=message,
-                sensor_id=sensor_id,
-                service_desk_id=project.service_desk_id or "0",
-                request_type_id=project.request_type_id or "0",
-                reporter=reporter,
-                prtg_request_instance=prtg_request_instance,
-                instance=instance # make it jira_instance later
+    if jira_request.status in down_warning_statuses:
+        if not open_ticket_key:
+            customer_id: str = jira_service.get_customer_id(jira_request.tags, jira_request.probe)
+            if customer_id == "0":
+                # problem_response.detail = f"Problem 19: Can not find CustomerID for {jira_request.name} Please manually Acknowledge and Create Ticket {jira_request.sensor_id}"
+                # problem_response.status_code = 404 # might update this to something else 
+                return _problem_response(f"Problem 19: Can not find CustomerID for {jira_request.name} Please manually Acknowledge and Create Ticket {jira_request.sensor_id}", 404)
+            crm_key: str = await jira_service.get_crm_key(instance, customer_id, tenant) 
+            if not crm_key:
+                return _problem_response(f"Problem 20: Can not find Customer CRM for {jira_request.name}.  Please manually Acknowledge and Create Ticket {jira_request.sensor_id}", 404)
+            if project.service_desk:
+                new_ticket_id: str = await jira_service.new_jira_ticket_service_desk( # new_ticket_id can be service or jira ticket
+                    device=device,
+                    name=name,
+                    status=status,
+                    message=message,
+                    sensor_id=sensor_id,
+                    service_desk_id=project.service_desk_id or "0",
+                    request_type_id=project.request_type_id or "0",
+                    reporter=reporter,
+                    prtg_request_instance=prtg_request_instance,
+                    instance=instance # make it jira_instance later
 
-            ) # can be service or jira ticket
-        else: 
-                new_ticket_id: str = await jira_service.new_jira_ticket_service_desk(
-                device=device,
-                name=name,
-                status=status,
-                message=message,
-                sensor_id=sensor_id,
-                service_desk_id=project.service_desk_id or "0",
-                request_type_id=project.request_type_id or "0",
-                reporter=reporter,
-                prtg_request_instance=prtg_request_instance,
-                instance=instance # make it jira_instance later
+                ) 
+            else: 
+                    new_ticket_id: str = await jira_service.new_jira_ticket_service_desk(
+                    device=device,
+                    name=name,
+                    status=status,
+                    message=message,
+                    sensor_id=sensor_id,
+                    service_desk_id=project.service_desk_id or "0",
+                    request_type_id=project.request_type_id or "0",
+                    reporter=reporter,
+                    prtg_request_instance=prtg_request_instance,
+                    instance=instance # make it jira_instance later
 
-            ) # can be service or jira ticket
+                ) # can be service or jira ticket
             if new_ticket_id != "-1": # ensure right newJiraTicketId
-            update_jira_ticket: int = jira_service.update_jira_ticket(instance, new_ticket_id, crm_key, reporter)
-            if update_jira_ticket != 0:
-                    return _problem_response(f"Problem 25: Error occurred updating Ticket.\n Please review Logs.", 503)
-            set_comment: bool = await prtg_service.append_sensor_comment_async()
+                update_jira_ticket: int = jira_service.update_jira_ticket(instance, new_ticket_id, crm_key, reporter)
+                if update_jira_ticket != 0:
+                        return _problem_response("Problem 25: Error occurred updating Ticket.\n Please review Logs.", 503)
+                set_comment: bool = await prtg_service.append_sensor_comment_async()
+                if not set_comment:
+                    return _problem_response("Problem 23: Error occurred setting Sensor comment.\n Please review Logs.", 503)
+            ack_result: int = await prtg_service.acknowledge_alarm_async(instance.lower(), sensor_id, new_ticket_id) 
+            if ack_result > 0:
+                return _problem_response("Problem 16: Error occurred Acknowledging Sensor.\n Please review Logs.", 503)
+            else:
+                return {"Status": "OK"}
+            # Not adding the Problem 15 as it never reaches it
+        else:
+            await jira_service.add_jira_comment_async(
+                instance, 
+                open_ticket_key, 
+                device,
+                name,
+                status,
+                message,
+                comment_internal
+                 )
+            if status in ["Down",  "Down (before: Warning)", "Warning ended (now: Down)"]:
+                ack_result = await prtg_service.acknowledge_alarm_async(instance.lower(), sensor_id, open_ticket_key) 
+                if ack_result > 0:
+                    return _problem_response("Problem 17: Error occurred Acknowledging Sensor.\n Please review Logs.", 503)
+                else:
+                    return {"Status": "OK"}
+                
+            return {"Status": "OK"}
+        
+    elif jira_request.status in up_ended_statuses:
+        if open_ticket_key:
+            set_comment: bool = await jira_service.add_jira_comment_async(
+                instance, 
+                open_ticket_key, 
+                device, 
+                name, 
+                status, 
+                message, 
+                comment_internal
+                )
             if not set_comment:
-                 
+                logger.error(f"Problem 23: {jira_request}")
+                return _problem_response("Problem 23: Error occurred Setting Jira Comment.\n Please review Logs.", 503)
+        logger.warn(f"Problem 21: {jira_request}") # Essentially rechecking if there is no open ticket as done in C#
+        return {"Status": "Problem 21: No Open Tickets found for this Sensor"}
+    else: 
+        logger.error(f"Problem 18: {jira_request}")
+        return _problem_response("Problem 18: Status not Found in Body", 503)
+
+if __name__ == "__main__":
+    import uvicorn
+    settings = get_settings()
+    uvicorn.run(
+        "app.main:app",
+        host=settings.host,
+        port=settings.port,
+        reload=(settings.environment=="development")
+    )

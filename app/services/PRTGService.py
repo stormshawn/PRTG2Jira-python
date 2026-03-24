@@ -1,21 +1,18 @@
 import datetime
+import logging
+import xml.etree.ElementTree as ET
 from typing import Any, Dict, List, Optional
 import httpx
-import logging
-
 from app.config import get_instance_config
+
 logger: logging.Logger = logging.getLogger(__name__)
-import xml.etree.ElementTree as ET
-
-
-
 
 
 class PRTGService():
     def __init__(self):
         self.http_client: httpx.AsyncClient = httpx.AsyncClient(timeout=30, verify=False)
 
-    async def acknowledge_alarm_async(self, instance:str, sensor_id: str, new_jira_ticket_id: str) -> int:
+    async def acknowledge_alarm_async(self, instance:str, sensor_id: int, new_jira_ticket_id: str) -> int:
         try:
             response: httpx.Response = await self.http_client.get(self._create_query(f"acknowledgealarm.htm?id={sensor_id}&ackmsg={new_jira_ticket_id}", instance))
             if response.status_code in [200]: # only need 200 since it is a get call 
@@ -30,14 +27,14 @@ class PRTGService():
         
     
     async def append_sensor_comment_async(self, instance: str, sensor_id: int, new_jira_ticket_id: str)-> bool:
-        comment: str  = await self._get_sensor_comment_async(self, instance, sensor_id)
+        comment: str  = await self._get_sensor_comment_async(instance, sensor_id)
         logger.debug(f"Received current Sensor comment ({sensor_id}) from Server: {comment}: ")
-        comment =  f"{comment}\n{datetime.datetime} {new_jira_ticket_id}"
+        comment =  f"{comment}\n{datetime.datetime.now()} {new_jira_ticket_id}"
         logger.debug(f"Appended comment ({sensor_id}): {comment}: ")
         return await self._set_sensor_comment_async(instance, sensor_id, comment)
 
 
-    def _parse_xml_result(xml: str)-> Optional[str]:
+    def _parse_xml_result(self, xml: str)-> Optional[str]:
         root: ET.Element = ET.fromstring(xml) # first two lines
         result_node: Optional[ET.Element] = root.find("result") # prtg will already be the parent node, so we only need to pass result
         return result_node.text if result_node is not None else None
