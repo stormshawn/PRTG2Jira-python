@@ -3,7 +3,7 @@ from app.models.ValueDto import ValueDto
 from app.models.InsightDto import InsightDto
 from app.models.IssueDto import IssueDto
 from app.models.JiraIssuesDto import JiraIssuesDto
-from app.models.JiraProjectSettingsDto import JiraProjectSettingsDt
+from app.models.JiraProjectSettingsDto import JiraProjectSettingsDto
 from app.models.JiraRequestDto import JiraRequestDto
 from app.models.ObjectEntryDto import ObjectEntryDto
 from app.models.ProblemResponseDto import ProblemResponseDto

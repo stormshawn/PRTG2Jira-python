@@ -3,7 +3,7 @@ Main application will go here
 """
 from contextlib import asynccontextmanager
 import logging
-from typing import List, Optional, Annotated
+from typing import List, Optional
 
 from fastapi import FastAPI, Form
 from fastapi.responses import JSONResponse
@@ -69,6 +69,7 @@ async def process_prtg_notification(instance: str,  # TODO: change from instance
 
     jira_request: JiraRequestDto = JiraRequestDto(status=status,
                                               name=name,
+                                              sensor_id=sensor_id,
                                               priority= priority,
                                               probe=probe,
                                               device=device,
@@ -97,7 +98,7 @@ async def process_prtg_notification(instance: str,  # TODO: change from instance
         logger.error(f"Problem 26: {jira_request}")
         return _problem_response("Problem 26", 500)
 
-    open_ticket_key: str = await jira_service.get_first_open_ticket_async(instance, jira_request.sensor_id, project.project_key)
+    open_ticket_key: str = await jira_service.get_first_open_ticket_async(jira_request_instance, jira_request.sensor_id, project.project_key)
 
     down_warning_statuses: List[str] = [
          "Down",
@@ -119,7 +120,7 @@ async def process_prtg_notification(instance: str,  # TODO: change from instance
                 # problem_response.detail = f"Problem 19: Can not find CustomerID for {jira_request.name} Please manually Acknowledge and Create Ticket {jira_request.sensor_id}"
                 # problem_response.status_code = 404 # might update this to something else 
                 return _problem_response(f"Problem 19: Can not find CustomerID for {jira_request.name} Please manually Acknowledge and Create Ticket {jira_request.sensor_id}", 404)
-            crm_key: str = await jira_service.get_crm_key(instance, customer_id, tenant) 
+            crm_key: str = await jira_service.get_crm_key(jira_request_instance, customer_id, tenant) 
             if not crm_key:
                 return _problem_response(f"Problem 20: Can not find Customer CRM for {jira_request.name}.  Please manually Acknowledge and Create Ticket {jira_request.sensor_id}", 404)
             if project.service_desk:
@@ -129,44 +130,40 @@ async def process_prtg_notification(instance: str,  # TODO: change from instance
                     status=status,
                     message=message,
                     sensor_id=sensor_id,
-                    service_desk_id=project.service_desk_id or "0",
-                    request_type_id=project.request_type_id or "0",
-                    reporter=reporter,
-                    prtg_request_instance=prtg_request_instance,
-                    instance=instance # make it jira_instance later
-
+                    service_desk_id=project.service_desk_id or 0,
+                    request_type_id=project.request_type_id or 0,
+                    raise_on_behalf_of=reporter,
+                    monitoring_instance=prtg_request_instance,
+                    jira_instance=jira_request_instance # make it jira_instance later
                 ) 
             else: 
-                    new_ticket_id: str = await jira_service.new_jira_ticket_service_desk(
+                    new_ticket_id: str = await jira_service.new_jira_ticket(
                     device=device,
                     name=name,
                     status=status,
                     message=message,
                     sensor_id=sensor_id,
-                    service_desk_id=project.service_desk_id or "0",
-                    request_type_id=project.request_type_id or "0",
-                    reporter=reporter,
-                    prtg_request_instance=prtg_request_instance,
-                    instance=instance # make it jira_instance later
-
-                ) # can be service or jira ticket
+                    project=project.project_key,
+                    monitoring_instance=prtg_request_instance,
+                    jira_instance=jira_request_instance
+                    ) # can be service or jira ticket
             if new_ticket_id != "-1": # ensure right newJiraTicketId
-                update_jira_ticket: int = jira_service.update_jira_ticket(instance, new_ticket_id, crm_key, reporter)
+                update_jira_ticket: int = jira_service.update_jira_ticket(jira_request_instance, new_ticket_id, crm_key, reporter)
                 if update_jira_ticket != 0:
                         return _problem_response("Problem 25: Error occurred updating Ticket.\n Please review Logs.", 503)
                 set_comment: bool = await prtg_service.append_sensor_comment_async()
                 if not set_comment:
                     return _problem_response("Problem 23: Error occurred setting Sensor comment.\n Please review Logs.", 503)
-            ack_result: int = await prtg_service.acknowledge_alarm_async(instance.lower(), sensor_id, new_ticket_id) 
+            ack_result: int = await prtg_service.acknowledge_alarm_async(prtg_request_instance.lower(), sensor_id, new_ticket_id) 
             if ack_result > 0:
                 return _problem_response("Problem 16: Error occurred Acknowledging Sensor.\n Please review Logs.", 503)
             else:
-                return {"Status": "OK"}
+                return {"status": "ok"}
             # Not adding the Problem 15 as it never reaches it
         else:
             await jira_service.add_jira_comment_async(
-                instance, 
-                open_ticket_key, 
+                jira_request_instance,
+                open_ticket_key,
                 device,
                 name,
                 status,
@@ -174,18 +171,18 @@ async def process_prtg_notification(instance: str,  # TODO: change from instance
                 comment_internal
                  )
             if status in ["Down",  "Down (before: Warning)", "Warning ended (now: Down)"]:
-                ack_result = await prtg_service.acknowledge_alarm_async(instance.lower(), sensor_id, open_ticket_key) 
+                ack_result = await prtg_service.acknowledge_alarm_async(prtg_request_instance.lower(), sensor_id, open_ticket_key) 
                 if ack_result > 0:
                     return _problem_response("Problem 17: Error occurred Acknowledging Sensor.\n Please review Logs.", 503)
                 else:
-                    return {"Status": "OK"}
+                    return {"status": "ok"}
                 
-            return {"Status": "OK"}
+            return {"status": "ok"}
         
     elif jira_request.status in up_ended_statuses:
         if open_ticket_key:
             set_comment: bool = await jira_service.add_jira_comment_async(
-                instance, 
+                jira_request_instance, 
                 open_ticket_key, 
                 device, 
                 name, 
@@ -197,7 +194,7 @@ async def process_prtg_notification(instance: str,  # TODO: change from instance
                 logger.error(f"Problem 23: {jira_request}")
                 return _problem_response("Problem 23: Error occurred Setting Jira Comment.\n Please review Logs.", 503)
         logger.warn(f"Problem 21: {jira_request}") # Essentially rechecking if there is no open ticket as done in C#
-        return {"Status": "Problem 21: No Open Tickets found for this Sensor"}
+        return {"status": "Problem 21: No Open Tickets found for this Sensor"}
     else: 
         logger.error(f"Problem 18: {jira_request}")
         return _problem_response("Problem 18: Status not Found in Body", 503)
