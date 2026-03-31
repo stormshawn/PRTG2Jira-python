@@ -193,7 +193,7 @@ async def process_prtg_notification(instance: str,  # TODO: change from instance
             if not set_comment:
                 logger.error(f"Problem 23: {jira_request}")
                 return _problem_response("Problem 23: Error occurred Setting Jira Comment.\n Please review Logs.", 503)
-        logger.warn(f"Problem 21: {jira_request}") # Essentially rechecking if there is no open ticket as done in C#
+        logger.warning(f"Problem 21: {jira_request}") # Essentially rechecking if there is no open ticket as done in C#
         return {"status": "Problem 21: No Open Tickets found for this Sensor"}
     else: 
         logger.error(f"Problem 18: {jira_request}")
