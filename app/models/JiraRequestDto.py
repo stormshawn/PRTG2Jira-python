@@ -1,13 +1,14 @@
+from typing import Optional
+
 from pydantic import BaseModel
+
 
 class JiraRequestDto(BaseModel):
     status: str
     name: str
     sensor_id: int
-    priority: str
-    probe: str
-    device: str
-    message: str
-    tags: str
-
-
+    priority: Optional[str] = None
+    probe: Optional[str] = None
+    device: Optional[str] = None
+    message: Optional[str] = None
+    tags: Optional[str] = None
