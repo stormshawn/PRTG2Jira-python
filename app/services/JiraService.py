@@ -404,7 +404,10 @@ class JiraService:
             for key, value in section.items():
                 if key.lower() == "default":
                     continue
-                if any(tag.lower() in key.lower() for tag in tag_list):
+                if any(
+                    tag.lower() in key.lower() for tag in tag_list
+                ):  # This essentially only checks the second item in the list
+                    # I would be curious to know if that is the business workflow needed of the C# code
                     matched_section = value if isinstance(value, dict) else {}
                     break
             if matched_section is None:

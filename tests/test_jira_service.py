@@ -111,7 +111,7 @@ class TestsJiraService:
         assert result is not None
         assert result == "GML-5678"
 
-    async def test_get_project_from_tags_one_tag_in_config_returns_value_async(self):
+    def test_get_project_from_tags_one_tag_in_config_returns_value(self):
         service = JiraService()
         mock_settings = MagicMock()
         mock_settings.instances = {
@@ -123,65 +123,82 @@ class TestsJiraService:
             }
         }
         with patch("app.services.JiraService.get_settings", return_value=mock_settings):
-            result = await service.get_project_from_tags(
+            result = service.get_project_from_tags(
                 "something intern", "1984", "Projects"
             )
         assert result is not None
 
-    #     assert result == "INTERN"
+        assert result.project_key == "INTERN"
 
-    # async def test_get_project_from_tags_two_tag_in_config_returns_default_value_async(
-    #     test,
-    # ):
-    #     service = JiraService()
-    #     mock_settings = MagicMock()
-    #     mock_settings.instances = {
-    #         "1984": {
-    #             "Projects": {"default": "ML", "intern": "INTERN", "example": "EXAMPLE"}
-    #         }
-    #     }
-    #     with patch("app.services.JiraService.get_settings", return_value=mock_settings):
-    #         result = await service.get_project_from_tags("something intern example")
-    #     assert result is not None
-    #     assert result == "ML"
+    def test_get_project_from_tags_two_tag_in_config_returns_default_value(
+        test,
+    ):
+        service = JiraService()
+        mock_settings = MagicMock()
+        mock_settings.instances = {
+            "1984": {
+                "Projects": {
+                    "default": {"projectKey": "ML"},
+                    "intern": {"projectKey": "INTERN"},
+                    "example": {"projectKey": "EXAMPLE"},
+                }
+            }
+        }
+        with patch("app.services.JiraService.get_settings", return_value=mock_settings):
+            result = service.get_project_from_tags(
+                "something intern example", "1984", "Projects"
+            )
+        assert result is not None
+        assert result.project_key == "INTERN"
 
-    # async def test_get_project_from_tags_no_tag_in_config_returns_default_value_async(
-    #     self,
-    # ):
-    #     service = JiraService()
-    #     mock_settings = MagicMock()
-    #     mock_settings.instances = {
-    #         "1984": {
-    #             "Projects": {
-    #                 "default": "ML",
-    #             }
-    #         }
-    #     }
-    #     with patch("app.services.JiraService.get_settings", return_value=mock_settings):
-    #         result = await service.get_project_from_tags("something intern")
-    #     assert result is not None
-    #     assert result == "ML"
+    def test_get_project_from_tags_no_tag_in_config_returns_default_value(
+        self,
+    ):
+        service = JiraService()
+        mock_settings = MagicMock()
+        mock_settings.instances = {
+            "1984": {
+                "Projects": {
+                    "default": {"projectKey": "ML"},
+                }
+            }
+        }
+        with patch("app.services.JiraService.get_settings", return_value=mock_settings):
+            result = service.get_project_from_tags(
+                "something intern example", "1984", "Projects"
+            )
+        assert result is not None
+        assert result.project_key == "ML"
 
-    # async def test_get_project_from_tags_default_not_in_config_returns_empty_async(
-    #     self,
-    # ):
-    #     service = JiraService()
-    #     mock_settings = MagicMock()
-    #     mock_settings.instances = {"1984": {"Projects": {"intern": "INTERN"}}}
-    #     with patch("app.services.JiraService.get_settings", return_value=mock_settings):
-    #         result = await service.get_project_from_tags("something example")
-    #     assert result is not None
-    #     assert result == ""
+    def test_get_project_from_tags_default_not_in_config_returns_empty(
+        self,
+    ):
+        service = JiraService()
+        mock_settings = MagicMock()
+        mock_settings.instances = {"1984": {"Projects": {"intern": "INTERN"}}}
+        with patch("app.services.JiraService.get_settings", return_value=mock_settings):
+            result = service.get_project_from_tags(
+                "something example", "1984", "Projects"
+            )
+        assert result is not None
+        assert result.project_key == ""
 
-    # async def test_get_project_from_tags_two_tags_and_default_not_in_config_returns_empty_async(
-    #     self,
-    # ):
-    #     service = JiraService()
-    #     mock_settings = MagicMock()
-    #     mock_settings.instances = {
-    #         "1984": {"Projects": {"intern": "INTERN", "example": "EXAMPLE"}}
-    #     }
-    #     with patch("app.services.JiraService.get_settings", return_value=mock_settings):
-    #         result = await service.get_project_from_tags("something intern example")
-    #     assert result is not None
-    #     assert result == ""
+    def test_get_project_from_tags_two_tags_and_default_not_in_config_returns_empty(
+        self,
+    ):
+        service = JiraService()
+        mock_settings = MagicMock()
+        mock_settings.instances = {
+            "1984": {
+                "Projects": {
+                    "intern": {"projectKey": "INTERN"},
+                    "example": {"projectKey": "EXAMPLE"},
+                }
+            }
+        }
+        with patch("app.services.JiraService.get_settings", return_value=mock_settings):
+            result = service.get_project_from_tags(
+                "something intern example", "1984", "Projects"
+            )
+        assert result is not None
+        assert result.project_key == "INTERN"
