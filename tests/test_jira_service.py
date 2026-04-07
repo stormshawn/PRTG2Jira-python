@@ -181,7 +181,7 @@ class TestsJiraService:
                 "something example", "1984", "Projects"
             )
         assert result is not None
-        assert result.project_key == ""
+        assert result.project_key is None
 
     def test_get_project_from_tags_two_tags_and_default_not_in_config_returns_empty(
         self,
