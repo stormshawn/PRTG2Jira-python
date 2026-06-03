@@ -1,15 +1,9 @@
 {
   "AllowedIPs": ["127.0.0.1", "::1"],
   "default-jira-base-url": "stage-service.medialine.ag/jira",
-<<<<<<< HEAD
   "default-jira-token": "yourtokenhere",
   "default-prtg-base-url": "http://127.0.0.1",
   "default-prtg-token": "yourtokenhere",
-=======
-  "default-jira-token": "your_token_here",
-  "default-prtg-base-url": "http://127.0.0.1",
-  "default-prtg-token": "your_token_here",
->>>>>>> 3ba79bb (All tests pass)
   "Instances": {
     "1984": {
       "Projects": {
