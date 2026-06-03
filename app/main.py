@@ -1,7 +1,3 @@
-"""
-Main application will go here
-"""
-
 from contextlib import asynccontextmanager
 import logging
 from typing import List, Optional
@@ -14,9 +10,11 @@ from app.models import JiraProjectSettingsDto, ProblemResponseDto, JiraRequestDt
 from app.services import JiraService, PRTGService
 
 logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s- %(name)s - %(levelname)s - %(message)s"
+    level=logging.INFO, format="%(asctime)s- %(name)s - %(levelname)s - %(message)s"  #
 )
-logger: logging.Logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(
+    __name__
+)  # Making a logger instance for the main class
 
 
 def _problem_response(detail: str, status_code: int) -> JSONResponse:
@@ -30,12 +28,14 @@ def _problem_response(detail: str, status_code: int) -> JSONResponse:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    import os
+
     logger.info("Starting PRTG service")
     load_config()
     settings = get_settings()
     logger.info(f"Environment: {settings.environment}")
     yield
-    logger.info("Shutting down PRTG Service")
+    logger.info("Shutting down PG Service")
 
 
 app: FastAPI = FastAPI(
@@ -56,23 +56,23 @@ jira_service: JiraService = JiraService()
 prtg_service: PRTGService = PRTGService()
 
 
-@app.get(
+@app.get(  # get endpoint used to define an endpoint, to see if app is down
     "/status",
     tags=["Health"],
     summary="Health Check",
     description="Returns http OK to verify that the application is running",
 )
 async def health_check():
-    return {"status:": "OK"}
+    return {"status": "OK"}
 
 
-@app.post(
+@app.post(  # used to create resources and returns responses 200 or 201 (depending on the use case)
     "/{instance}/prtg2jira",
     tags=["PRTG Integration"],
     summary="Process PRTG notification",
     description="Receives http notification from PRTG and creates/updates Jira issue",
 )
-async def process_prtg_notification(
+async def process_prtg_notification(  # when prtg server hits this endpoint, it sends in these arguments
     instance: str,  # TODO: change from instance to jira_instance
     status: Optional[str] = Form(None),
     name: Optional[str] = Form(None),
@@ -113,9 +113,9 @@ async def process_prtg_notification(
     )
     tenant: str = jira_service.get_from_tags(tags, instance, "Tenant")
     reporter: str = jira_service.get_from_tags(tags, instance, "Reporter")
-    comment_internal: bool = (
-        jira_service.get_from_tags(tags, instance, "Comment").lower() != "extern"
-    )
+
+    comment_value = jira_service.get_from_tags(tags, instance, "Comment") or ""
+    comment_internal: bool = comment_value.lower() != "extern"
 
     if not project.project_key:
         logger.error(f"Problem 22: {jira_request}")
@@ -178,7 +178,7 @@ async def process_prtg_notification(
                         request_type_id=project.request_type_id or 0,
                         raise_on_behalf_of=reporter,
                         monitoring_instance=prtg_request_instance,
-                        jira_instance=jira_request_instance,  # make it jira_instance later
+                        jira_instance=jira_request_instance  # make it jira_instance later
                     )
                 )
             else:
@@ -193,7 +193,7 @@ async def process_prtg_notification(
                     jira_instance=jira_request_instance,
                 )  # can be service or jira ticket
             if new_ticket_id != "-1":  # ensure right newJiraTicketId
-                update_jira_ticket: int = jira_service.update_jira_ticket(
+                update_jira_ticket: int = await jira_service.update_jira_ticket(
                     jira_request_instance, new_ticket_id, crm_key, reporter
                 )
                 if update_jira_ticket != 0:
@@ -201,7 +201,9 @@ async def process_prtg_notification(
                         "Problem 25: Error occurred updating Ticket.\n Please review Logs.",
                         503,
                     )
-                set_comment: bool = await prtg_service.append_sensor_comment_async()
+                set_comment: bool = await prtg_service.append_sensor_comment_async(
+                    prtg_request_instance.lower(), sensor_id, new_ticket_id
+                )
                 if not set_comment:
                     return _problem_response(
                         "Problem 23: Error occurred setting Sensor comment.\n Please review Logs.",
@@ -269,10 +271,12 @@ async def process_prtg_notification(
                     "Problem 23: Error occurred Setting Jira Comment.\n Please review Logs.",
                     503,
                 )
-        logger.warning(
-            f"Problem 21: {jira_request}"
-        )  # Essentially rechecking if there is no open ticket as done in C#
-        return {"status": "Problem 21: No Open Tickets found for this Sensor"}
+            return {"status": "ok"}
+        else:
+            logger.warning(
+                f"Problem 21: {jira_request}"
+            )  # Essentially rechecking if there is no open ticket as done in C#
+            return {"status": "Problem 21: No Open Tickets found for this Sensor"}
     else:
         logger.error(f"Problem 18: {jira_request}")
         return _problem_response("Problem 18: Status not Found in Body", 400)

@@ -185,9 +185,11 @@ class JiraService:
         request_type_id: int,
         raise_on_behalf_of: str,
         monitoring_instance: str,
-        jira_instance: str,
+        jira_instance: str
+        # priority: str,
+        # crm_key: str
     ) -> str:
-
+        _priority_map = {""}
         base_url: Optional[str] = get_instance_config(jira_instance, "jira-base-url")
         prtg_url: str = get_instance_config(monitoring_instance, "prtg-base-url")
         token: str = get_instance_config(jira_instance, "jira-token")
@@ -200,19 +202,20 @@ class JiraService:
             "serviceDeskId": service_desk_id,
             "requestTypeId": request_type_id,
             "requestFieldValues": {
-                "summary": f"[PRTG] {device} {name} {status}",
-                "description": (
-                    f"This is an automatically created issue by PRTG.\n"
-                    f"The device {device} with the name {name} shows the status {status}.\n"
-                    f"The PRTG message is {message} \n"
-                    f"The URL from the sensor is: https://{prtg_url}/sensor.htm?id={sensor_id}&tabid=1"
-                ),
+                "summary": f"[PRTG] {device} {name} {status}"
+                # ,"description": (
+                #     f"This is an automatically created issue by PRTG.\n"
+                #     f"The device {device} with the name {name} shows the status {status}.\n"
+                #     f"The PRTG message is {message} \n"
+                #     f"The URL from the sensor is: https://{prtg_url}/sensor.htm?id={sensor_id}&tabid=1"
+                # ),
             },
             "raiseOnBehalfOf": raise_on_behalf_of,
         }
         # ticketjson not required
 
         try:
+            print("FINAL SERVICE DESK PAYLOAD:", ticket_parameters)
             response: httpx.Response = await self.http_client.post(
                 f"https://{base_url}/rest/servicedeskapi/request",
                 json=ticket_parameters,
@@ -358,7 +361,7 @@ class JiraService:
         project_keys: Optional[Dict[str, Any]] = instance_config.get(setting)
         if not project_keys:
             return ""
-        tag_list: List[str] = tags.split()
+        tag_list: List[str] = (tags or "").split()
 
         try:
             matched_value: Optional[str] = None
@@ -398,7 +401,7 @@ class JiraService:
         if not section:
             return JiraProjectSettingsDto()
 
-        tag_list: List[str] = tags.split()
+        tag_list: List[str] = (tags or "").split()
         try:
             matched_section: Optional[Dict[str, Any]] = None
             for key, value in section.items():

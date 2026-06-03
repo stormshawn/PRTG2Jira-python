@@ -4,13 +4,13 @@ import xml.etree.ElementTree as ET
 from typing import Any, Dict, List, Optional
 import httpx
 from app.config import get_instance_config
-
+from urllib.parse import quote
 logger: logging.Logger = logging.getLogger(__name__)
 
 
 class PRTGService():
     def __init__(self):
-        self.http_client: httpx.AsyncClient = httpx.AsyncClient(timeout=30, verify=False)
+        self.http_client: httpx.AsyncClient = httpx.AsyncClient(timeout=30, verify=False, follow_redirects=True)
 
     async def acknowledge_alarm_async(self, instance:str, sensor_id: int, new_jira_ticket_id: str) -> int:
         try:
@@ -59,7 +59,7 @@ class PRTGService():
         return ""
         
     async def _set_sensor_comment_async(self, instance: str, sensor_id: int, comment: str)-> bool:
-        response: httpx.Response = await self.http_client.get(self._create_query(f"setobjectproperty.htm?id={sensor_id}&name=comments&value={comment}", instance))
+        response: httpx.Response = await self.http_client.get(self._create_query(f"setobjectproperty.htm?id={sensor_id}&name=comments&value={quote(comment)}", instance))
         if response.is_success:
             logger.info(f"Comment of the sensor with the Sensor ID {sensor_id} was successfully set.")
             return True

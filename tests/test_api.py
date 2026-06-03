@@ -9,7 +9,7 @@ from app.main import app
 from app.services import JiraService, PRTGService
 
 
-# TOD here need to think here later
+# TODO here need to think here later
 class TestsApi:
 
     @pytest.fixture(autouse=True)
@@ -370,7 +370,7 @@ class TestsApi:
                     self.mock_jira_service.get_crm_key.return_value = ""
 
                     # self.mock_prtg_service.acknowledge_alarm_async.return_value = 1
-                    client = TestClient(app)
+                    client = TestClient(app)  # creates FastAPI instance
 
                     response = client.post(
                         f"{request_endpoint}/prtg2jira",

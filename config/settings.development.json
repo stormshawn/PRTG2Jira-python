@@ -1,0 +1,58 @@
+{
+  "AllowedIPs": ["127.0.0.1", "::1"],
+  "default-jira-base-url": "stage-service.medialine.ag/jira",
+  "default-jira-token": "yourtokenhere",
+  "default-prtg-base-url": "http://127.0.0.1",
+  "default-prtg-token": "yourtokenhere",
+  "Instances": {
+    "1984": {
+      "Projects": {
+        "intern": { "serviceDesk": false, "projectKey": "ISSD" },
+        "default": { "serviceDesk": false, "projectKey": "ML" }
+      },
+      "Tenant": { "default": "FIM1" },
+      "Reporter": { "default": "1984@medialine.ag" },
+      "Comment": { "default": "intern" },
+      "WarningNotification": false
+    },
+    "monitoringCC": {
+      "Projects": {
+        "intern": { "serviceDesk": false, "projectKey": "ISSD" },
+        "default": { "serviceDesk": false, "projectKey": "MSSD" }
+      },
+      "Tenant": { "default": "FIM1" },
+      "Reporter": { "default": "medialine-internal-admin" },
+      "Comment": { "default": "intern" },
+      "WarningNotification": true
+    },
+    "stage": {
+      "Projects": {
+        "intern": { "serviceDesk": false, "projectKey": "ISSD" },
+        "default": { "serviceDesk": false, "projectKey": "MSSD" }
+      },
+      "Tenant": { "default": "ML13" },
+      "Reporter": { "default": "medialine-internal-admin" },
+      "Comment": { "default": "intern" },
+      "WarningNotification": true
+    },
+    "dussm": {
+      "Projects": {
+        "intern": { "serviceDesk": false, "projectKey": "MSSD" },
+        "default": { "serviceDesk": false, "projectKey": "ML" }
+      },
+      "Tenant": { "default": "FIM1" },
+      "Reporter": {
+        "default": "1984@medialine.ag",
+        "intern": "medialine-internal-admin"
+      },
+      "Comment": { "default": "intern" },
+      "WarningNotification": false
+    }
+  },
+  "KeyVaultName": "",
+  "Environment": "development",
+  "DefaultJiraBaseUrl": "stage-service.medialine.ag/jira",
+  "DefaultJiraToken": "YOUR_TOKEN",
+  "DefaultPrtgBaseUrl": "localhost",
+  "DefaultPrtgToken": ""
+}
