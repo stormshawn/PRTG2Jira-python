@@ -45,9 +45,9 @@ class PRTGService():
         prtg_hash: Optional[str] = get_instance_config(instance, "prtg-hash")
         prtg_username: str = get_instance_config(instance, "prtg-username")
         if token and token.strip():
-            return f"{base_url}/api/{query}&apitoken={token}"
+            return f"https://{base_url}/api/{query}&apitoken={token}"
         elif prtg_username and prtg_username.strip() and prtg_hash and prtg_hash.strip():
-             return f"{base_url}/api/{query}&username={prtg_username}&passhash={prtg_hash}"
+             return f"https://{base_url}/api/{query}&username={prtg_username}&passhash={prtg_hash}"
         return ""
     
     async def _get_sensor_comment_async(self, instance: str, sensor_id:int)-> str:

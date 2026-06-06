@@ -467,7 +467,7 @@ class TestsApi:
                         "ML-2345"
                     )
                     self.mock_prtg_service.acknowledge_alarm_async.return_value = 1
-                    self.mock_jira_service.update_jira_ticket = MagicMock(
+                    self.mock_jira_service.update_jira_ticket = AsyncMock(
                         return_value=0
                     )
                     self.mock_jira_service.append_sensor_comment_async = AsyncMock(
@@ -531,7 +531,7 @@ class TestsApi:
                     self.mock_jira_service.new_jira_ticket.return_value = "ML-2345"
 
                     self.mock_prtg_service.acknowledge_alarm_async.return_value = 0
-                    self.mock_jira_service.update_jira_ticket = MagicMock(
+                    self.mock_jira_service.update_jira_ticket = AsyncMock(
                         return_value=0
                     )
                     self.mock_jira_service.append_sensor_comment_async = AsyncMock(

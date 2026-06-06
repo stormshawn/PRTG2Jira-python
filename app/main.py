@@ -16,7 +16,7 @@ logger: logging.Logger = logging.getLogger(
     __name__
 )  # Making a logger instance for the main class
 
-
+# helper function to prevent duplicacy 
 def _problem_response(detail: str, status_code: int) -> JSONResponse:
     problem: ProblemResponseDto = ProblemResponseDto(
         detail=detail, status_code=status_code
@@ -25,7 +25,7 @@ def _problem_response(detail: str, status_code: int) -> JSONResponse:
         status_code=status_code, content=problem.model_dump(by_alias=True)
     )
 
-
+# Lifespan of API and shutting down app configuration
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     import os
@@ -34,21 +34,21 @@ async def lifespan(app: FastAPI):
     load_config()
     settings = get_settings()
     logger.info(f"Environment: {settings.environment}")
-    yield
-    logger.info("Shutting down PG Service")
+    yield # main app running with this yield
+    logger.info("Shutting down PG Service") # app shuts down here
 
 
 app: FastAPI = FastAPI(
     title="PRTG2JIRA API",
     description="Receives notifications from PRTG and creates/updates JIRA issues",
     version="1.0.0",
-    lifespan=lifespan,
+    lifespan=lifespan
 )
 
 settings = get_settings()
 if settings.environment == "production":
     app.add_middleware(
-        IPWhitelistMiddleware, allowed_ips=settings.allowed_ips, enabled=True
+        IPWhitelistMiddleware, allowed_ips=settings.allowed_ips, enabled=True # Allow only specific IPs
     )
     logger.info("IP whitelist middleware enabled")
 
@@ -56,7 +56,7 @@ jira_service: JiraService = JiraService()
 prtg_service: PRTGService = PRTGService()
 
 
-@app.get(  # get endpoint used to define an endpoint, to see if app is down
+@app.get(  # Get endpoint used to define an endpoint, to see if app is down
     "/status",
     tags=["Health"],
     summary="Health Check",
@@ -65,14 +65,13 @@ prtg_service: PRTGService = PRTGService()
 async def health_check():
     return {"status": "OK"}
 
-
-@app.post(  # used to create resources and returns responses 200 or 201 (depending on the use case)
+@app.post(  # Post used to create resources/endpoint and returns responses 200 or 201 (depending on the use case)
     "/{instance}/prtg2jira",
     tags=["PRTG Integration"],
     summary="Process PRTG notification",
     description="Receives http notification from PRTG and creates/updates Jira issue",
 )
-async def process_prtg_notification(  # when prtg server hits this endpoint, it sends in these arguments
+async def process_prtg_notification(  # When prtg server hits this post endpoint, it sends in these arguments for this method
     instance: str,  # TODO: change from instance to jira_instance
     status: Optional[str] = Form(None),
     name: Optional[str] = Form(None),
@@ -145,7 +144,9 @@ async def process_prtg_notification(  # when prtg server hits this endpoint, it 
         "Warning ended (now: Up)",
         "Up",
     ]
+
     # problem_response: ProblemResponseDto = None
+    # Main business logic:
     if jira_request.status in down_warning_statuses:
         if not open_ticket_key:
             customer_id: str = jira_service.get_customer_id(
@@ -193,6 +194,7 @@ async def process_prtg_notification(  # when prtg server hits this endpoint, it 
                     jira_instance=jira_request_instance,
                 )  # can be service or jira ticket
             if new_ticket_id != "-1":  # ensure right newJiraTicketId
+                # updates the crm key in jira
                 update_jira_ticket: int = await jira_service.update_jira_ticket(
                     jira_request_instance, new_ticket_id, crm_key, reporter
                 )

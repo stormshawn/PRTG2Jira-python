@@ -73,7 +73,7 @@ class JiraService:
         }
         # comment_template: str = "*This is an automatically created comment by PRTG:* {0}{0}The device {1} with the name {2} shows the status {3}.{0}The PRTG message is: {4}"
         comment: str = (
-            f"This is an automatically created comment by PRTG: The device {device} with the name {name} shows the status  {status}.The PRTG message is: \n\n{message}"
+            f"This is an automatically created comment by PRTG: The device {device} with the name {name} shows the status  {status}. The PRTG message is: \n\n{message}"
         )
         valuepayload: ValueDto = ValueDto()
         valuepayload.internal = comment_internal
@@ -203,12 +203,12 @@ class JiraService:
             "requestTypeId": request_type_id,
             "requestFieldValues": {
                 "summary": f"[PRTG] {device} {name} {status}"
-                # ,"description": (
-                #     f"This is an automatically created issue by PRTG.\n"
-                #     f"The device {device} with the name {name} shows the status {status}.\n"
-                #     f"The PRTG message is {message} \n"
-                #     f"The URL from the sensor is: https://{prtg_url}/sensor.htm?id={sensor_id}&tabid=1"
-                # ),
+                ,"description": (
+                    f"This is an automatically created issue by PRTG.\n"
+                    f"The device {device} with the name {name} shows the status {status}.\n"
+                    f"The PRTG message is {message} \n"
+                    f"The URL from the sensor is: https://{prtg_url}/sensor.htm?id={sensor_id}&tabid=1"
+                )
             },
             "raiseOnBehalfOf": raise_on_behalf_of,
         }
