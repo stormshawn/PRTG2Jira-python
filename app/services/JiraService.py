@@ -404,30 +404,35 @@ class JiraService:
         tag_list: List[str] = (tags or "").split()
         try:
             matched_section: Optional[Dict[str, Any]] = None
+            matched_str: Optional[str] = None
             for key, value in section.items():
                 if key.lower() == "default":
                     continue
-                if any(
-                    tag.lower() in key.lower() for tag in tag_list
-                ):  # This essentially only checks the second item in the list
+                if any(tag.lower() in key.lower() for tag in tag_list):  # This essentially only checks the second item in the list
                     # I would be curious to know if that is the business workflow needed of the C# code
                     matched_section = value if isinstance(value, dict) else {}
+                    if isinstance(value, dict):
+                        matched_section = value
+                    elif isinstance(value, str):
+                        matched_str = value
                     break
-            if matched_section is None:
-                default_section: Optional[Dict[str, Any]] = section.get("default")
-                if default_section and isinstance(default_section, dict):
-                    matched_section = default_section
+            if matched_section is None and matched_str is None:
+                default_value: Optional[Dict[str, Any]] = section.get("default")
+                if  isinstance(default_value, dict):
+                    matched_section = default_value
+                elif isinstance(default_value, str):
+                    matched_str = default_value
+            settings: JiraProjectSettingsDto = JiraProjectSettingsDto()
+            if matched_str:
+                settings.project_key = matched_str
+                return settings 
             if matched_section is not None:
-                settings: JiraProjectSettingsDto = JiraProjectSettingsDto()
                 for key, value in matched_section.items():
                     key_lower: str = key.lower()
                     if key_lower == "projectkey":
                         settings.project_key = value if value else ""
                     elif key_lower == "servicedesk":
-                        if isinstance(value, bool):
-                            settings.service_desk = value
-                        else:
-                            settings.service_desk = False
+                        settings.service_desk = value if isinstance(value, bool) else False
                     elif key_lower == "servicedeskid":
                         settings.service_desk_id = int(value) if value else None
                     elif key_lower == "requesttypeid":
